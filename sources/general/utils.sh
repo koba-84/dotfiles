@@ -138,7 +138,8 @@ function brew-sync {
     [ "$has_new" = true ]     && echo -e "  ${red}c${reset} = cleanup extras     ${red}C${reset} = select which to remove"
     echo -e "  ${dim}q${reset} = quit"
     echo ""
-    read -rp "Action: " ans
+    printf "Action: "
+    read -r ans
 
     case "$ans" in
         i)
@@ -150,7 +151,8 @@ function brew-sync {
             for type in tap brew cask mas; do
                 [ -s "$BREW_DIFF_DIR/missing_${type}" ] || continue
                 while IFS= read -r pkg; do
-                    read -rp "Install ${type} ${pkg}? [y/N] " confirm
+                    printf "Install %s %s? [y/N] " "$type" "$pkg"
+                    read -r confirm
                     if [[ "$confirm" == [yY] ]]; then
                         case "$type" in
                             tap)  brew tap "$pkg" ;;
@@ -171,7 +173,8 @@ function brew-sync {
             for type in tap brew cask mas; do
                 [ -s "$BREW_DIFF_DIR/new_${type}" ] || continue
                 while IFS= read -r pkg; do
-                    read -rp "Remove ${type} ${pkg}? [y/N] " confirm
+                    printf "Remove %s %s? [y/N] " "$type" "$pkg"
+                    read -r confirm
                     if [[ "$confirm" == [yY] ]]; then
                         case "$type" in
                             tap)  brew untap "$pkg" ;;
