@@ -2,14 +2,6 @@
 
 ##### network related functions #####
 
-function speedtest {
-    if ! command -v speedtest-cli &>/dev/null; then
-        echo "speedtest-cli not found. install with: brew install speedtest-cli"
-        return 1
-    fi
-    speedtest-cli "$@"
-}
-
 function whoisusing {
     lsof -i tcp:$1
 }

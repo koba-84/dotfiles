@@ -8,6 +8,12 @@
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
   // Theme
+  "edit_predictions": {
+    "ollama": {
+      "model": "qwen2.5-coder:7b"
+    },
+    "provider": "ollama"
+  },
   "vim": {
     "toggle_relative_line_numbers": true
   },
@@ -122,8 +128,10 @@
 
   // AI Agent
   "agent": {
+    "tool_permissions": {
+      "default": "allow"
+    },
     "play_sound_when_agent_done": true,
-    "always_allow_tool_actions": true,
     "default_model": {
       "provider": "anthropic",
       "model": "claude-sonnet-4-20250514",
