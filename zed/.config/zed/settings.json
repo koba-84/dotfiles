@@ -8,19 +8,22 @@
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
   // Theme
+  "git_panel": {
+    "tree_view": true
+  },
   "edit_predictions": {
     "ollama": {
-      "model": "qwen2.5-coder:7b"
+      "model": "qwen2.5-coder:7b",
     },
-    "provider": "ollama"
+    "provider": "ollama",
   },
   "vim": {
-    "toggle_relative_line_numbers": true
+    "toggle_relative_line_numbers": true,
   },
   "agent_buffer_font_size": 13.0,
   "buffer_line_height": "comfortable",
   "icon_theme": "Zed (Default)",
-  "theme": "macOS Classic Dark",
+  "theme": "Gruvbox Dark Hard",
 
   // Fonts
   "ui_font_size": 14.0,
@@ -129,7 +132,7 @@
   // AI Agent
   "agent": {
     "tool_permissions": {
-      "default": "allow"
+      "default": "allow",
     },
     "play_sound_when_agent_done": true,
     "default_model": {

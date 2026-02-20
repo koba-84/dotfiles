@@ -12,27 +12,23 @@ function set-permissions-for-brew {
     sudo chown -R $(whoami) $(brew --prefix)/*
 }
 
-function brew-backup {
-    brew bundle dump --no-vscode --force --global
-}
-
-function brew-check {
+# Shared helper: dump current brew state, extract entries, compute diffs.
+# Sets BREW_DIFF_DIR to a temp directory containing:
+#   dump, dump_entries, curated_entries, {dump,curated}_{tap,brew,cask,mas}
+#   new_{tap,brew,cask,mas}, missing_{tap,brew,cask,mas}
+# Caller is responsible for cleaning up BREW_DIFF_DIR.
+function _brew_diff {
     if ! command -v brew &>/dev/null; then
         echo "Error: brew is not installed" >&2
         return 1
     fi
 
-    local brewfile="${HOMEBREW_BUNDLE_FILE:-$HOME/.Brewfile}"
-    if [ ! -f "$brewfile" ]; then
-        echo "Error: Brewfile not found at $brewfile" >&2
+    BREW_DIFF_BREWFILE="${HOMEBREW_BUNDLE_FILE:-$HOME/.Brewfile}"
+    if [ ! -f "$BREW_DIFF_BREWFILE" ]; then
+        echo "Error: Brewfile not found at $BREW_DIFF_BREWFILE" >&2
         return 1
     fi
 
-    # Colors
-    local green='\033[0;32m' yellow='\033[0;33m' cyan='\033[0;36m'
-    local bold='\033[1m' dim='\033[2m' reset='\033[0m'
-
-    # Detect current OS
     local current_os
     if [[ "$OSTYPE" == darwin* ]]; then
         current_os="mac"
@@ -40,12 +36,17 @@ function brew-check {
         current_os="linux"
     fi
 
-    # Extract type\tname pairs from a Brewfile, filtering out entries
-    # inside OS-conditional blocks that don't match the current host.
-    # Usage: _brew_check_extract <file> [filter]
-    #   filter=os   - skip entries in incompatible OS blocks (for curated Brewfile)
-    #   filter=none - extract everything (for brew dump output, which has no conditionals)
-    _brew_check_extract() {
+    BREW_DIFF_DIR=$(mktemp -d)
+
+    echo -e "\033[1mbrew:\033[0m Dumping current brew state..."
+    if ! brew bundle dump --no-vscode --file="$BREW_DIFF_DIR/dump" 2>/dev/null; then
+        echo "Error: brew bundle dump failed" >&2
+        rm -rf "$BREW_DIFF_DIR"
+        return 1
+    fi
+
+    # Extract type\tname pairs, filtering OS-conditional blocks in curated Brewfile
+    _brew_extract() {
         local file="$1" filter="${2:-none}"
         awk -v os="$current_os" -v filter="$filter" '
             BEGIN { skip = 0 }
@@ -65,80 +66,125 @@ function brew-check {
         ' "$file" | sort -u
     }
 
-    # Dump current state to temp file
-    local tmpdir
-    tmpdir=$(mktemp -d)
-    # shellcheck disable=SC2064
-    trap "rm -rf '$tmpdir'" EXIT INT TERM
+    echo -e "\033[1mbrew:\033[0m Comparing against curated Brewfile..."
 
-    echo -e "${bold}brew-check:${reset} Dumping current brew state..."
-    if ! brew bundle dump --no-vscode --file="$tmpdir/dump" 2>/dev/null; then
-        echo "Error: brew bundle dump failed" >&2
-        return 1
-    fi
+    _brew_extract "$BREW_DIFF_DIR/dump" none > "$BREW_DIFF_DIR/dump_entries"
+    _brew_extract "$BREW_DIFF_BREWFILE" os > "$BREW_DIFF_DIR/curated_entries"
+    unset -f _brew_extract
 
-    echo -e "${bold}brew-check:${reset} Comparing against curated Brewfile..."
-    echo ""
+    local type
+    for type in tap brew cask mas; do
+        grep "^${type}	" "$BREW_DIFF_DIR/dump_entries" | cut -f2 > "$BREW_DIFF_DIR/dump_${type}" 2>/dev/null || true
+        grep "^${type}	" "$BREW_DIFF_DIR/curated_entries" | cut -f2 > "$BREW_DIFF_DIR/curated_${type}" 2>/dev/null || true
+        comm -23 "$BREW_DIFF_DIR/dump_${type}" "$BREW_DIFF_DIR/curated_${type}" > "$BREW_DIFF_DIR/new_${type}" 2>/dev/null || true
+        comm -13 "$BREW_DIFF_DIR/dump_${type}" "$BREW_DIFF_DIR/curated_${type}" > "$BREW_DIFF_DIR/missing_${type}" 2>/dev/null || true
+    done
+}
 
-    # Extract entries from both files (filter OS blocks in curated Brewfile)
-    _brew_check_extract "$tmpdir/dump" none > "$tmpdir/dump_entries"
-    _brew_check_extract "$brewfile" os > "$tmpdir/curated_entries"
+function brew-sync {
+    local green='\033[0;32m' yellow='\033[0;33m' cyan='\033[0;36m' red='\033[0;31m'
+    local bold='\033[1m' dim='\033[2m' reset='\033[0m'
+
+    _brew_diff || return 1
 
     local has_new=false has_missing=false
-
-    # Show NEW packages (installed but not in Brewfile)
-    echo -e "${bold}=== NEW packages (installed but not in Brewfile) ===${reset}"
-    echo ""
+    local type
     for type in tap brew cask mas; do
-        grep "^${type}	" "$tmpdir/dump_entries" | cut -f2 > "$tmpdir/dump_${type}" 2>/dev/null || true
-        grep "^${type}	" "$tmpdir/curated_entries" | cut -f2 > "$tmpdir/curated_${type}" 2>/dev/null || true
-        local new
-        new=$(comm -23 "$tmpdir/dump_${type}" "$tmpdir/curated_${type}" 2>/dev/null)
-        echo -e "  ${bold}${type}:${reset}"
-        if [ -n "$new" ]; then
-            has_new=true
-            while IFS= read -r pkg; do
-                echo -e "    ${green}+ ${pkg}${reset}"
-            done <<< "$new"
-        else
-            echo -e "    ${dim}(none)${reset}"
-        fi
-        echo ""
+        [ -s "$BREW_DIFF_DIR/new_${type}" ] && has_new=true
+        [ -s "$BREW_DIFF_DIR/missing_${type}" ] && has_missing=true
     done
 
-    # Show MISSING packages (in Brewfile but not installed)
-    echo -e "${bold}=== MISSING packages (in Brewfile but not installed) ===${reset}"
+    # Show diff
     echo ""
-    for type in tap brew cask mas; do
-        local missing
-        missing=$(comm -13 "$tmpdir/dump_${type}" "$tmpdir/curated_${type}" 2>/dev/null)
-        echo -e "  ${bold}${type}:${reset}"
-        if [ -n "$missing" ]; then
-            has_missing=true
-            while IFS= read -r pkg; do
-                echo -e "    ${yellow}- ${pkg}${reset}"
-            done <<< "$missing"
-        else
-            echo -e "    ${dim}(none)${reset}"
-        fi
+    if [ "$has_missing" = true ]; then
+        echo -e "${bold}=== MISSING packages (in Brewfile but not installed) ===${reset}"
         echo ""
-    done
+        for type in tap brew cask mas; do
+            if [ -s "$BREW_DIFF_DIR/missing_${type}" ]; then
+                echo -e "  ${bold}${type}:${reset}"
+                while IFS= read -r pkg; do
+                    echo -e "    ${yellow}- ${pkg}${reset}"
+                done < "$BREW_DIFF_DIR/missing_${type}"
+                echo ""
+            fi
+        done
+    fi
 
-    # Summary
+    if [ "$has_new" = true ]; then
+        echo -e "${bold}=== EXTRA packages (installed but not in Brewfile) ===${reset}"
+        echo ""
+        for type in tap brew cask mas; do
+            if [ -s "$BREW_DIFF_DIR/new_${type}" ]; then
+                echo -e "  ${bold}${type}:${reset}"
+                while IFS= read -r pkg; do
+                    echo -e "    ${green}+ ${pkg}${reset}"
+                done < "$BREW_DIFF_DIR/new_${type}"
+                echo ""
+            fi
+        done
+    fi
+
     if [ "$has_new" = false ] && [ "$has_missing" = false ]; then
         echo -e "${green}Everything is in sync.${reset}"
+        rm -rf "$BREW_DIFF_DIR"
+        return 0
     fi
-    echo -e "${cyan}Curated Brewfile: ${brewfile} (not modified)${reset}"
-    if [ "$has_new" = true ]; then
-        echo -e "${cyan}Tip: Manually add new packages to the appropriate section in your Brewfile.${reset}"
-    fi
-    unset -f _brew_check_extract
-}
 
-function brew-restore {
-    brew bundle --global
-}
+    # Action menu
+    echo -e "${cyan}Brewfile: ${BREW_DIFF_BREWFILE}${reset}"
+    echo ""
+    echo -e "${bold}Actions:${reset}"
+    [ "$has_missing" = true ] && echo -e "  ${yellow}i${reset} = install missing    ${yellow}I${reset} = select which to install"
+    [ "$has_new" = true ]     && echo -e "  ${red}c${reset} = cleanup extras     ${red}C${reset} = select which to remove"
+    echo -e "  ${dim}q${reset} = quit"
+    echo ""
+    read -rp "Action: " ans
 
-function brew-cleanup {
-    brew bundle cleanup --global --force
+    case "$ans" in
+        i)
+            echo ""
+            brew bundle --global
+            ;;
+        I)
+            echo ""
+            for type in tap brew cask mas; do
+                [ -s "$BREW_DIFF_DIR/missing_${type}" ] || continue
+                while IFS= read -r pkg; do
+                    read -rp "Install ${type} ${pkg}? [y/N] " confirm
+                    if [[ "$confirm" == [yY] ]]; then
+                        case "$type" in
+                            tap)  brew tap "$pkg" ;;
+                            brew) brew install "$pkg" ;;
+                            cask) brew install --cask "$pkg" ;;
+                            mas)  mas install "$pkg" ;;
+                        esac
+                    fi
+                done < "$BREW_DIFF_DIR/missing_${type}"
+            done
+            ;;
+        c)
+            echo ""
+            brew bundle cleanup --global --force
+            ;;
+        C)
+            echo ""
+            for type in tap brew cask mas; do
+                [ -s "$BREW_DIFF_DIR/new_${type}" ] || continue
+                while IFS= read -r pkg; do
+                    read -rp "Remove ${type} ${pkg}? [y/N] " confirm
+                    if [[ "$confirm" == [yY] ]]; then
+                        case "$type" in
+                            tap)  brew untap "$pkg" ;;
+                            brew) brew uninstall "$pkg" ;;
+                            cask) brew uninstall --cask "$pkg" ;;
+                            mas)  mas uninstall "$pkg" ;;
+                        esac
+                    fi
+                done < "$BREW_DIFF_DIR/new_${type}"
+            done
+            ;;
+        *)
+            ;;
+    esac
+    rm -rf "$BREW_DIFF_DIR"
 }
