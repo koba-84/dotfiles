@@ -9,7 +9,7 @@
 {
   // Theme
   "git_panel": {
-    "tree_view": true
+    "tree_view": true,
   },
   "edit_predictions": {
     "ollama": {
@@ -22,8 +22,36 @@
   },
   "agent_buffer_font_size": 13.0,
   "buffer_line_height": "comfortable",
-  "icon_theme": "Material Icon Theme",
-  "theme": "One Dark Pro Max",
+  "icon_theme": "Zed (Default)",
+  "theme": "One Dark",
+  "theme_overrides": {
+    "One Dark": {
+      "border": "#333333FF",
+      "elevated_surface.background": "#000000FF",
+      "surface.background": "#000000FF",
+      "background": "#000000FF",
+      "status_bar.background": "#000000FF",
+      "title_bar.background": "#000000FF",
+      "title_bar.inactive_background": "#2E343EFF",
+      "toolbar.background": "#000000FF",
+      "tab_bar.background": "#000000FF",
+      "tab.inactive_background": "#000000FF",
+      "tab.active_background": "#000000FF",
+      "panel.background": "#000000FF",
+      "editor.background": "#000000FF",
+      "editor.gutter.background": "#000000FF",
+      "editor.subheader.background": "#000000FF",
+      "editor.highlighted_line.background": "#000000FF",
+      "terminal.background": "#000000FF",
+      "element.background": "#0a0a0aFF",
+      "ghost_element.background": "#00000000",
+      "drop_target.background": "#1a1a1aFF",
+      "editor.active_line.background": "#111111FF",
+      "search.match_background": "#3a3a00FF",
+      "border.variant": "#222222FF",
+      "panel.focused_border": "#4a4a4aFF",
+    },
+  },
 
   // Fonts
   "ui_font_size": 14.0,
