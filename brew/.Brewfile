@@ -154,6 +154,7 @@ if OS.mac?
   cask "zed"
   cask "zoom"
 
+  mas "Amphetamine", id: 937984704
   mas "Monosnap", id: 540348655
   mas "Numbers", id: 409203825
   mas "Windows App", id: 1295203466
