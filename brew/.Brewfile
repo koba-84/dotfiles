@@ -46,6 +46,7 @@ brew "ollama", restart_service: :changed
 brew "openapi-generator"
 brew "opentofu"
 brew "pandoc"
+brew "podman"
 brew "pass"
 brew "pass-otp"
 brew "pgcli"
@@ -155,6 +156,7 @@ if OS.mac?
   cask "zoom"
 
   mas "Amphetamine", id: 937984704
+  mas "Telegram", id: 747648890
   mas "Monosnap", id: 540348655
   mas "Numbers", id: 409203825
   mas "Windows App", id: 1295203466
@@ -163,5 +165,6 @@ end
 # ─── Linux Only ───────────────────────────────────────────────────────────────
 if OS.linux?
   flatpak "com.google.Chrome"
+  flatpak "org.telegram.desktop"
   flatpak "dev.zed.Zed"
 end
