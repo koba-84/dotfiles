@@ -96,7 +96,6 @@ export PYENV_ROOT="$HOME/.pyenv"
 # Add pyenv to PATH
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 # Initialize pyenv (handles both PATH setup and shell integration in v2.x+)
-eval "$(pyenv init -)"
 # Enable pyenv virtualenv if installed
 if command -v pyenv-virtualenv-init > /dev/null; then
   eval "$(pyenv virtualenv-init -)"
